@@ -1,0 +1,15 @@
+# data collection and handling
+requests>=2.31
+pandas>=2.1
+pyarrow>=14
+numpy>=1.26
+
+# models and evaluation (weeks 2 to 4)
+scipy>=1.11
+scikit-learn>=1.4
+torch>=2.2
+shap>=0.45
+matplotlib>=3.8
+
+# tests
+pytest>=8

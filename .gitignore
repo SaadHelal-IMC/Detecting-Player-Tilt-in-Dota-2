@@ -1,0 +1,15 @@
+# data is rebuilt from the API by the scripts, never committed
+data/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# local secrets and editor files
+.env
+.idea/
+.vscode/
