@@ -1,4 +1,4 @@
-"""Runs the day-1 check script end to end on fake API answers."""
+"""Runs the setup check script end to end on fake API answers."""
 import runpy
 import sys
 

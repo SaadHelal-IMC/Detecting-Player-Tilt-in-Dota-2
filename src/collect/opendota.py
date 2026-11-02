@@ -4,12 +4,12 @@ Every successful response is saved under data/raw/, so a run that crashes or
 hits the daily limit can simply be started again and only fetches what is
 still missing. Nothing here is clever on purpose, it is one function.
 
-Free tier is roughly 60 calls per minute and 2,000 per day. Set the
+Free tier is 60 calls per minute and about 3,000 per day. Set the
 environment variable OPENDOTA_API_KEY if you ever buy a key, it is sent with
 every request but never written into the cache file names.
 
-Set TILT_DATA_DIR to keep the data folder outside the repo, e.g. outside
-OneDrive, so thousands of cache files do not get synced.
+Set TILT_DATA_DIR to keep the data folder outside the repo, e.g. when the
+repo lives in a synced folder, so thousands of cache files are not synced.
 """
 import hashlib
 import json

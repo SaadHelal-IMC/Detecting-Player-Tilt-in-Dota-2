@@ -1,0 +1,7 @@
+# same line endings (LF) on Windows and Linux, so diffs only show real changes
+* text=auto eol=lf
+
+# never touch binary files
+*.png binary
+*.pdf binary
+*.parquet binary
