@@ -60,6 +60,29 @@ Two changes, pending confirmation by the supervisor:
   players per medal, the candidates checked were (private vs. with data):
   Herald 72 vs. 25, Guardian 66 vs. 21, Crusader 43 vs. 21, Archon 31 vs. 20,
   Legend 42 vs. 20, Ancient 16 vs. 20, Divine 15 vs. 20, Immortal 2 vs. 20.
+- **Final collection (2 to 7 Nov 2026):** 3,993 candidates checked for 1,200
+  usable players. "Empty" means the history call returned no ranked match,
+  which almost always means hidden match data; "too few" means fewer than 100
+  ranked matches in the window.
+
+  | Medal | Checked | Usable | Too few | Empty |
+  | --- | --- | --- | --- | --- |
+  | Herald | 997 | 15.0% | 10.1% | 74.8% |
+  | Guardian | 751 | 20.0% | 6.1% | 73.9% |
+  | Crusader | 552 | 27.2% | 3.8% | 69.0% |
+  | Archon | 438 | 34.2% | 1.6% | 64.2% |
+  | Legend | 368 | 40.8% | 0.3% | 59.0% |
+  | Ancient | 344 | 43.6% | 0.9% | 55.5% |
+  | Divine | 281 | 53.4% | 1.1% | 45.6% |
+  | Immortal | 262 | 57.3% | 1.5% | 41.2% |
+
+- **This is a stratified sample, not a simple random one.** Which players
+  enter a medal depends only on which public ranked matches were recent at
+  collection time and on the fixed rules above; no player was picked or
+  removed by hand. Equal numbers per medal are on purpose, because SQ3
+  compares medals and a simple random draw would be dominated by the middle
+  medals. Results are reported per medal and not weighted to the player
+  population.
 - Limitations: lower-bracket samples are a more self-selected group (only
   about a quarter of those players expose their data), and sampling from
   recent public matches favours players who are active right now.
@@ -132,7 +155,7 @@ negative gaps (0.07%, overlapping records) are set to 0.
 | Decision | Choice |
 | --- | --- |
 | Model scope | Mahalanobis per player (Ledoit-Wolf shrunk covariance of the baseline window); Isolation Forest, OCSVM, LSTM-AE global |
-| Split | 5-fold cross-validation grouped by player and stratified by bracket; every player is in a test fold exactly once |
+| Split | 5-fold cross-validation grouped by `cv_group` (one player, or players who share at least 10 matches, section 10) and stratified by bracket; every player is in a test fold exactly once |
 | Tuning | on a validation slice of players inside each training fold, never on the test fold |
 | Threshold | top 5% of scores, set on the validation slice; AUPRC and P@k are threshold-free |
 
@@ -178,21 +201,122 @@ abandon rate and whether the session ends. Paired Wilcoxon test per bracket.
 
 ## 9. Sample observations
 
-From the cleaned interim sample (771 players, 319,194 matches; final numbers
-follow with the frozen dataset):
+From dataset v1 (1,180 players, 487,683 matches; collected 2 to 7 Nov 2026).
+**v1 is frozen** in `frozen/v1/` in the data folder with a manifest of row
+counts and SHA-256 checksums of every file and of the scripts that built
+them (`python -m src.clean.freeze v1`). Features, labels and models read only
+from v1; a changed dataset gets a new version, never an overwrite.
 
+- 1,200 players passed the collector's check (at least 100 ranked matches in the
+  window); 20 drop out in cleaning, because clean also removes runs under 20
+  matches between 30-day breaks. Herald loses most (150 to 140), since
+  low-bracket players take more breaks. Not topped up; CV folds are stratified
+  by bracket.
 - Low brackets play less: the median number of matches per player in the
-  window is 280 (Herald) and 329 (Guardian), against 500 (the cap) from
-  Archon upwards.
-- The solo share rises with skill, from 0.36 in Herald to 0.69 in Immortal
-  (with the party_size caveat from section 2).
+  window is 279 (Herald) and 305 (Guardian), against 500 (the cap) from Archon
+  upwards. The median span is 473 days in Herald against 256 in Immortal.
+- The solo share, over matches with known party_size, is high in every bracket
+  (0.65 to 0.81): highest in Herald (0.81) and Immortal (0.80), lowest in Legend
+  and Ancient (0.65, 0.66). An earlier version counted missing party_size as
+  not solo. Low brackets reach further back into 2024 and 2025, where
+  party_size is mostly missing, so that produced a false rising trend (0.36 to
+  0.69).
 - The mean win rate rises with the bracket, from 0.45 in Herald to 0.52 in
   Immortal, probably because players sampled at a rank today are more often
   ones who climbed into it.
-- Profile medal and recent lobby medal agree within one medal for 96% to 99%
+- Profile medal and recent lobby medal agree within one medal for 95% to 99%
   of players per bracket.
-- 416 games under 10 minutes.
+- 507 games under 10 minutes (flagged, not dropped).
 
-## 10. Out of scope
+## 10. Account screen
+
+Bot farms reached ranked Dota in 2026, and a sold or shared account mixes two
+people's play in one history. `src/clean/screen_accounts.py` computes eight
+account-level signals per player from the cleaned matches (no API calls) and
+marks a player as a suspect when at least two fire, or when one of the two
+direct signals (boost, throw days) fires. **Suspects are kept**; the
+sensitivity step reruns SQ2 without them.
+
+| Signal | Flagged when | Players |
+| --- | --- | --- |
+| Quiet hours: share of matches in the quietest 6 hours of the day (UTC), median over 30-day blocks with 30+ matches | > 0.15 | 12 |
+| Most matches started within 24 hours | > 27 | 11 |
+| Spread: geometric mean of the robust CVs of GPM, duration and KDA | < 0.12 | 0 |
+| Share of matches on the 3 most played heroes | > 0.95 | 12 |
+| Party: 5-stack share (known party_size) or share of matches with another sampled player (seed matches left out) | either > 0.5 | 44 |
+| Shift: change of heroes and play hours at one split point (min of the two TVDs, max over splits) | > 0.6 | 9 |
+| Boost: best win rate over 100 matches in a row | > 0.75 | 15 |
+| Throw days: UTC days with 8+ games, at most 20% wins and a median KDA under 0.5 | 1 or more | 7 |
+
+- Thresholds sit at about the 99th percentile of the 1,180 players, so each
+  signal alone flags about 1% (party about 4%, as two shares feed it). Spread
+  is the exception: nobody comes close to scripted uniformity (lowest value
+  0.29, a bot repeating identical games gives 0), so it keeps a fixed level and
+  flags no one.
+- **The thresholds were set after looking at this same sample, not fixed in
+  advance.** A first run with provisional values (quiet hours over the whole
+  window > 0.10, more than 24 matches in 24 hours, top-3 heroes > 0.90,
+  5-stack share > 0.5 and shared matches > 0.2 as two separate signals, shift
+  > 0.6, spread < 0.12) flagged 36 players, mostly ordinary ones; the changes
+  are described in the next points. This is a data-driven choice. It is
+  acceptable here because the screen only describes account quality, no
+  account is removed from the main analysis, and everything was fixed and
+  frozen (v1) before any tilt label or detector score existed. No decision
+  about the data has used labels or detector results.
+- Quiet hours are taken per 30-day block. Over the whole window, a player whose
+  schedule moved (new job, semester) looks like someone playing around the
+  clock: 168 players passed 0.10 that way, and their median per block is about
+  0.10. Per block the highest value is 0.185, against 0.25 for play spread
+  evenly over the day. 15 players have no block with 30+ matches and get no
+  quiet-hours value.
+- Boost and throw days each mark a suspect on their own, because they are
+  direct evidence rather than unusual habits. Matchmaking keeps honest players
+  near 50%: in 20,000 simulated histories of 500 games with a true win chance
+  of 55%, a 100-game stretch above 75% came up in 0.035%, so fewer than one
+  false flag is expected among 1,180 players. Both were added after the hand
+  check below showed a deranking day that the other signals only caught by
+  chance.
+- 5-stack share and shared matches count as one signal. Both measure playing
+  in a fixed group, and in a first run with separate counts they fired together
+  for 10 players.
+- Result: 1,083 players with no signal, 87 with one, 7 with two and 3 with
+  three. **20 players (1.7%) are flagged**, all of them through boost or throw
+  days: 15 with a boost stretch (all Ancient to Immortal, best stretches 0.76
+  to 0.92) and 7 with throw days (12 days in all, Herald to Divine, mostly in
+  5-stacks), 2 with both. **No player shows the bot pattern** (round-the-clock play together
+  with very long days and uniform games). This fits the documented 2026 bot
+  accounts having hidden match data, while only public profiles enter the
+  sample (section 3).
+- **Hand check (7 Nov 2026): both suspects confirmed, as smurf or boosted
+  accounts rather than bots.** The Legend account wins 83% of its other games;
+  on 9 Oct 2026 it lost 24 of 28 games in a 5-stack (median KDA 0.18, 183 GPM,
+  18 minutes). The replay of one of them shows the whole team
+  losing on purpose from minute 0: all five heroes walking into mid and
+  feeding, wards placed all over the map and other plainly senseless play
+  (deranking or a fixed match). The Ancient account won
+  89% of its first 140 games and from 21 Feb 2026 plays other heroes at other
+  hours with 45% wins, consistent with a boosted and then sold account
+  (pattern only, no replay checked). Verdicts are in
+  `account_screen_review.csv` in the data folder and override the automatic
+  flag; flagged accounts without a verdict stay suspects.
+- Throwing on purpose looks exactly like the tilt proxy label (losses in a
+  row, short gaps, very poor performance), so deliberate throwing and extreme
+  tilt are hard to tell apart from match statistics alone.
+- Replays: a 29-day-old replay was still on Valve's server (HTTP 200 on the
+  `replay_url` from OpenDota, 7 Nov 2026), so guides that give 7 to 14 days
+  are wrong or outdated (no official retention period from Valve was found). The file is
+  zstd-compressed despite its `.dem.bz2` name. The in-game download hung, so
+  it was downloaded directly and decompressed into Dota's replays folder.
+- Account ids with a suspect label stay in the data folder. The repo only holds
+  counts per bracket (`results/tables/account_screen_summary.csv`).
+
+**CV groups.** 3.8% of match rows (18,579) are in the histories of two or more
+sampled players, so those players share outcomes and timing in them. Players
+who share at least 10 matches are joined into one `cv_group` (126 players in 52
+groups of 2 to 5; everyone else is a group of one), and the CV folds keep each
+group together. Linking at a single shared match would chain 972 players into
+one group, mostly through one-off games in the same rank pool.
+
+## 11. Out of scope
 
 - Parsed-replay features (ward placements, item timings, per-minute curves).

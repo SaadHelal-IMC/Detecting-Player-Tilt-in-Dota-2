@@ -42,6 +42,8 @@ the repo.
 | Probe the sampling endpoints | `python -m src.collect.probe_sampling [min_rank max_rank]` | printed only |
 | Sample players and download histories (resumable) | `python -m src.collect.collect [--target 150] [--max-calls N]` | `interim/candidates.csv`, `raw/` |
 | Clean into one tidy table (cache only, no API) | `python -m src.clean.clean` | `processed/matches.parquet`, `processed/players.parquet`, `results/tables/dataset_summary.csv` |
+| Screen accounts for bots and shared accounts (after clean) | `python -m src.clean.screen_accounts` | `processed/account_screen.parquet`, `players.parquet` (+ `suspect_account`, `cv_group`), `interim/account_screen_check.csv`, `results/tables/account_screen_summary.csv` |
+| Freeze the dataset as a fixed version (later steps read only this) | `python -m src.clean.freeze v1` (`--check` verifies it) | `frozen/v1/` with `manifest.json` (rows, SHA-256 of files and scripts, git commit) |
 
 Still to come: features, labels, detectors, evaluation and analysis.
 
@@ -49,6 +51,7 @@ Still to come: features, labels, detectors, evaluation and analysis.
 
 ```
 data/            raw API cache and derived tables (not in git, rebuilt by scripts)
+data/frozen/     fixed dataset versions with checksum manifests (not in git)
 src/collect/     OpenDota client and collection scripts
 src/clean/       raw cache -> tidy match and player tables
 tests/           offline tests

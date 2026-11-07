@@ -94,7 +94,7 @@ def run():
     df["match_idx"] = df.groupby("account_id").cumcount()  # 0 = oldest match
 
     # --- 7: player table and bracket -----------------------------------------
-    df["solo"] = df["party_size"] == 1
+    df["solo"] = (df["party_size"] == 1).astype(float).where(df["party_size"].notna())
     players = df.groupby("account_id").agg(
         n_matches=("match_id", "size"),
         first_match=("start", "min"),
